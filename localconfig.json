@@ -1,0 +1,11 @@
+{
+  "verAddr": "https://sibok-sensi.onrender.com/",
+  "maintenance": false,
+  "sensitivityMultiplier": 3.5,
+  "aimAssistRatio": 0.88,
+  "touchResponseMs": 1,
+  "fpsCap": 120,
+  "recoilControlRate": 95.5,
+  "recoilXOffset": 0.0025,
+  "recoilYOffset": 0.0040
+}

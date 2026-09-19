@@ -1,0 +1,12 @@
+{
+  "name": "sibok-sensi-vip",
+  "version": "2.0.0",
+  "description": "SIBOK SENSI VIP Optimization Server",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIBOK SENSI VIP</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;900&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: #06090e; color: #e2e8f0; font-family: 'Rajdhani', sans-serif;
+            display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px;
+            background-image: radial-gradient(circle at 50% 10%, #102a43 0%, #06090e 70%);
+        }
+        .container {
+            background: rgba(13, 20, 31, 0.85); backdrop-filter: blur(12px);
+            border: 1px solid rgba(0, 229, 255, 0.2); border-top: 3px solid #00e5ff;
+            border-radius: 16px; padding: 35px 25px; width: 100%; max-width: 440px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 229, 255, 0.15); text-align: center;
+        }
+        .brand { font-family: 'Orbitron', sans-serif; font-size: 24px; font-weight: 900; color: #fff; text-shadow: 0 0 10px rgba(0, 229, 255, 0.6); }
+        .brand span { color: #00e5ff; }
+        .subtitle { font-size: 13px; color: #94a3b8; text-transform: uppercase; margin-bottom: 25px; letter-spacing: 1px; }
+        .input-box {
+            background: #090e17; border: 1px solid #1e293b; border-radius: 8px; padding: 14px;
+            width: 100%; color: #00e5ff; font-size: 16px; font-family: 'Orbitron', sans-serif;
+            text-align: center; outline: none; transition: 0.3s; letter-spacing: 2px;
+        }
+        .input-box:focus { border-color: #00e5ff; box-shadow: 0 0 12px rgba(0, 229, 255, 0.4); }
+        .btn-activate {
+            margin-top: 15px; width: 100%; padding: 15px; background: linear-gradient(135deg, #00e5ff, #0077ff);
+            border: none; border-radius: 8px; color: #000; font-family: 'Orbitron', sans-serif;
+            font-weight: 700; font-size: 15px; cursor: pointer; transition: 0.3s; text-transform: uppercase;
+        }
+        .btn-activate:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(0, 229, 255, 0.5); }
+        #statusBox { margin-top: 20px; font-size: 15px; font-weight: 600; min-height: 24px; }
+        .config-details {
+            display: none; margin-top: 20px; padding: 15px; background: rgba(0, 229, 255, 0.05);
+            border: 1px dashed rgba(0, 229, 255, 0.3); border-radius: 8px; text-align: left; font-size: 14px;
+        }
+        .config-item { display: flex; justify-content: space-between; margin: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px; }
+        .config-value { color: #00e5ff; font-weight: 700; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="brand">SIBOK <span>SENSI</span></div>
+        <div class="subtitle">VIP Cloud Optimization Portal</div>
+        <input type="text" id="vipKey" class="input-box" placeholder="SIBOK-XX-XXXXXX" autocomplete="off">
+        <button class="btn-activate" onclick="activateEngine()">APPLY VIP SENSITIVITY</button>
+        <div id="statusBox"></div>
+        <div id="configDetails" class="config-details">
+            <div class="config-item"><span>Sensitivity Multiplier:</span> <span class="config-value" id="valSensi">3.5x</span></div>
+            <div class="config-item"><span>Aim Assist Engine:</span> <span class="config-value" id="valAim">ACTIVE</span></div>
+            <div class="config-item"><span>Touch Response:</span> <span class="config-value" id="valTouch">1ms</span></div>
+            <div class="config-item"><span>Expiry Date:</span> <span class="config-value" id="valExpiry">-</span></div>
+        </div>
+    </div>
+    <script>
+        async function activateEngine() {
+            const key = document.getElementById('vipKey').value.trim();
+            const statusBox = document.getElementById('statusBox');
+            const configDetails = document.getElementById('configDetails');
+            if (!key) {
+                statusBox.style.color = '#ff4d4d'; statusBox.innerText = 'PLEASE ENTER A VALID KEY!'; return;
+            }
+            statusBox.style.color = '#00e5ff'; statusBox.innerText = 'AUTHENTICATING...';
+            try {
+                const res = await fetch('/api/validate-key', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key, hwid: navigator.userAgent })
+                });
+                const data = await res.json();
+                if (data.valid) {
+                    statusBox.style.color = '#00ff88'; statusBox.innerText = '✓ ACTIVATED SUCCESSFULLY!';
+                    configDetails.style.display = 'block';
+                    document.getElementById('valSensi').innerText = (data.config.sensitivityMultiplier || 3.5) + 'x';
+                    document.getElementById('valAim').innerText = data.config.aimAssistRatio ? 'ACTIVE' : 'OFF';
+                    document.getElementById('valTouch').innerText = (data.config.touchResponseMs || 1) + 'ms';
+                    document.getElementById('valExpiry').innerText = new Date(data.expiresAt).toLocaleDateString();
+                } else {
+                    statusBox.style.color = '#ff4d4d'; statusBox.innerText = '✕ ' + data.message;
+                    configDetails.style.display = 'none';
+                }
+            } catch (err) {
+                statusBox.style.color = '#ff4d4d'; statusBox.innerText = 'CONNECTION ERROR!';
+            }
+        }
+    </script>
+</body>
+</html>
