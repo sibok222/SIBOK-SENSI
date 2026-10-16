@@ -6,8 +6,8 @@ from flask import Flask, request
 BOT_TOKEN = "8621084667:AAGrNfeOwpl1H-6PYho3o6r2vICv2Mg4dLM"
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
-# Direct Image Link for Bot Logo
-LOGO_URL = "https://raw.githubusercontent.com/TelegramBots/static/main/logo.png"
+# වැඩ කරන ස්ථිර Public Logo Image Link එකක්
+LOGO_URL = "https://i.ibb.co/3s7s4vJ/bypass-logo.png"
 
 app = Flask(__name__)
 
@@ -210,8 +210,10 @@ def webhook():
                     ]
                 }
                 
-                # Photo send try karata passe fallback ekata text message eka yanawa
+                # Photo එක යැවීමට උත්සාහ කරයි
                 res = send_photo(chat_id, LOGO_URL, welcome_text, reply_markup=keyboard)
+                
+                # යම් හෙයකින් Photo එක යැවීමට නොහැකි වුවහොත් Text එක පමණක් යවයි
                 if not res.get("ok"):
                     send_message(chat_id, welcome_text, reply_markup=keyboard)
                 return "ok", 200
