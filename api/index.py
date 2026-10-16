@@ -3,12 +3,12 @@ import re
 import time
 import threading
 import requests
+from urllib.parse import urljoin
 from flask import Flask, request
 
 BOT_TOKEN = "8621084667:AAGrNfeOwpl1H-6PYho3o6r2vICv2Mg4dLM"
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
-# ඔයාගේ ImgBB Logo Link එක
 LOGO_URL = "https://i.ibb.co/60cF3xk3/logo.png"
 
 app = Flask(__name__)
@@ -199,14 +199,12 @@ def edit_message(chat_id, message_id, text):
     requests.post(f"{TELEGRAM_API}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": text, "parse_mode": "Markdown"})
 
 def resolve_url(url):
-    """අಂತಿම නියම සැබෑ ලින්ක් එක (Final Destination URL) ලබාගැනීම"""
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5'
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*|q=0.8',
     }
     
-    # 1. Bypass API එක හරහා සැබෑ අಂತಿම ලින්ක් එක ලබා ගැනීමට උත්සාහ කිරීම
+    # 1. Bypass API
     try:
         api_res = requests.get(f"https://api.bypass.vip/bypass?url={url}", timeout=10).json()
         if api_res.get("status") == "success" and api_res.get("destination"):
@@ -216,12 +214,14 @@ def resolve_url(url):
     except Exception:
         pass
 
-    # 2. Redirects හරහා අಂತಿම ලින්ක් එක සෙවීම
+    # 2. Redirect session check with urljoin
     try:
         session = requests.Session()
         res = session.get(url, headers=headers, allow_redirects=True, timeout=10)
-        if res.url and res.url != url and not "vplinks" in res.url:
-            return res.url
+        if res.url:
+            full_url = urljoin(url, res.url)
+            if full_url != url:
+                return full_url
     except Exception:
         pass
 
