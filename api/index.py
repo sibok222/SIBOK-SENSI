@@ -11,6 +11,9 @@ TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 # ImgBB Direct Image Link (Logo)
 LOGO_URL = "https://i.ibb.co/60cF3xk3/logo.png"
 
+# Telegram Animated Loading Sticker ID (Public Telegram Animated Sticker)
+LOADING_STICKER_FILE_ID = "CAACAgIAAxkBAAEZ75xnA3B4b6fC_8vXQ9F1v3aW_gABAAEC"
+
 app = Flask(__name__)
 
 SUPPORTED_SITES_TEXT = """🌐 **ꜱᴜᴩᴩᴏʀᴛᴇᴅ ꜱɪᴛᴇꜱ [147 ᴛᴏᴛᴀʟ]**
@@ -165,51 +168,45 @@ SUPPORTED_SITES_TEXT = """🌐 **ꜱᴜᴩᴩᴏʀᴛᴇᴅ ꜱɪᴛᴇꜱ [147 
 • Safelink"""
 
 def delete_message_later(chat_id, message_id, delay=1800):
-    """පැය බාගයකට (තත්පර 1800) පසු Message එක Auto Delete කරන Function එක"""
     def delayed_delete():
         time.sleep(delay)
-        url = f"{TELEGRAM_API}/deleteMessage"
-        payload = {"chat_id": chat_id, "message_id": message_id}
         try:
-            requests.post(url, json=payload)
+            requests.post(f"{TELEGRAM_API}/deleteMessage", json={"chat_id": chat_id, "message_id": message_id})
         except Exception:
             pass
-
-    # Background Thread එකකින් දුවවයි
     thread = threading.Thread(target=delayed_delete)
     thread.daemon = True
     thread.start()
 
 def send_message(chat_id, text, reply_markup=None, auto_delete=True):
-    url = f"{TELEGRAM_API}/sendMessage"
     payload = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
     if reply_markup:
         payload["reply_markup"] = reply_markup
-    res = requests.post(url, json=payload).json()
-    
-    msg_id = res.get("result", {}).get("message_id")
-    if msg_id and auto_delete:
-        delete_message_later(chat_id, msg_id, 1800) # 1800 seconds = 30 minutes
-        
-    return res
-
-def send_photo(chat_id, photo_url, caption, reply_markup=None, auto_delete=True):
-    url = f"{TELEGRAM_API}/sendPhoto"
-    payload = {"chat_id": chat_id, "photo": photo_url, "caption": caption, "parse_mode": "Markdown"}
-    if reply_markup:
-        payload["reply_markup"] = reply_markup
-    res = requests.post(url, json=payload).json()
-    
+    res = requests.post(f"{TELEGRAM_API}/sendMessage", json=payload).json()
     msg_id = res.get("result", {}).get("message_id")
     if msg_id and auto_delete:
         delete_message_later(chat_id, msg_id, 1800)
-        
     return res
 
+def send_photo(chat_id, photo_url, caption, reply_markup=None, auto_delete=True):
+    payload = {"chat_id": chat_id, "photo": photo_url, "caption": caption, "parse_mode": "Markdown"}
+    if reply_markup:
+        payload["reply_markup"] = reply_markup
+    res = requests.post(f"{TELEGRAM_API}/sendPhoto", json=payload).json()
+    msg_id = res.get("result", {}).get("message_id")
+    if msg_id and auto_delete:
+        delete_message_later(chat_id, msg_id, 1800)
+    return res
+
+def send_sticker(chat_id, sticker_id):
+    res = requests.post(f"{TELEGRAM_API}/sendSticker", json={"chat_id": chat_id, "sticker": sticker_id}).json()
+    msg_id = res.get("result", {}).get("message_id")
+    if msg_id:
+        delete_message_later(chat_id, msg_id, 1800)
+    return msg_id
+
 def edit_message(chat_id, message_id, text):
-    url = f"{TELEGRAM_API}/editMessageText"
-    payload = {"chat_id": chat_id, "message_id": message_id, "text": text, "parse_mode": "Markdown"}
-    requests.post(url, json=payload)
+    requests.post(f"{TELEGRAM_API}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": text, "parse_mode": "Markdown"})
 
 @app.route('/', methods=['POST', 'GET'])
 def webhook():
@@ -228,7 +225,6 @@ def webhook():
             text = data["message"]["text"].strip()
             user_msg_id = data["message"]["message_id"]
 
-            # User එවපු Link / Text එකත් පැය බාගයකින් Delete කරමු
             delete_message_later(chat_id, user_msg_id, 1800)
 
             if text == "/start":
@@ -256,11 +252,16 @@ def webhook():
             if url_match:
                 target_url = url_match.group(0)
 
-                sent_msg = send_message(chat_id, "⏳ **Bypassing link... [ █▒▒▒▒▒▒▒▒▒ ] 10%**")
+                # 1. Send Animated Loading Sticker
+                send_sticker(chat_id, LOADING_STICKER_FILE_ID)
+
+                # 2. Send Large Live Loading Message
+                sent_msg = send_message(chat_id, "🚀 **PROCESSING YOUR LINK...**\n\n`[ █▒▒▒▒▒▒▒▒▒ ] 10%`\n_Connecting to server..._")
                 msg_id = sent_msg.get("result", {}).get("message_id")
 
                 if msg_id:
-                    edit_message(chat_id, msg_id, "⏳ **Bypassing link... [ █████▒▒▒▒▒ ] 50%**")
+                    time.sleep(0.8)
+                    edit_message(chat_id, msg_id, "🚀 **PROCESSING YOUR LINK...**\n\n`[ █████▒▒▒▒▒ ] 50%`\n_Bypassing shortener redirects..._")
 
                 try:
                     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
@@ -268,17 +269,27 @@ def webhook():
                     final_url = response.url
 
                     if msg_id:
-                        edit_message(chat_id, msg_id, "⏳ **Bypassing link... [ ██████████ ] 100%**")
+                        time.sleep(0.5)
+                        edit_message(chat_id, msg_id, "🚀 **PROCESSING YOUR LINK...**\n\n`[ ██████████ ] 100%`\n_Almost done..._")
 
                     if final_url and final_url != target_url:
-                        reply_text = f"✅ **Original Link:**\n`{final_url}`\n\n⏱️ _Auto-deletes in 30 minutes._"
+                        reply_text = (
+                            "🎉 **BYPASS SUCCESSFUL!**\n\n"
+                            f"🔗 **Original Link:**\n`{final_url}`\n\n"
+                            "━━━━━━━━━━━━━━━━━━━\n"
+                            "⏱️ _This message will auto-delete in 30 minutes._"
+                        )
                         if msg_id:
                             edit_message(chat_id, msg_id, reply_text)
                             delete_message_later(chat_id, msg_id, 1800)
                         else:
                             send_message(chat_id, reply_text)
                     else:
-                        error_msg = "❌ **Failed to bypass this link or no redirect found.**"
+                        error_msg = (
+                            "❌ **BYPASS FAILED!**\n\n"
+                            "⚠️ Could not extract the direct link or no redirect found.\n\n"
+                            "⏱️ _Auto-deletes in 30 minutes._"
+                        )
                         if msg_id:
                             edit_message(chat_id, msg_id, error_msg)
                             delete_message_later(chat_id, msg_id, 1800)
@@ -286,7 +297,7 @@ def webhook():
                             send_message(chat_id, error_msg)
 
                 except Exception as e:
-                    error_msg = "❌ **Error occurred while processing!**"
+                    error_msg = "❌ **Error occurred while processing the link!**"
                     if msg_id:
                         edit_message(chat_id, msg_id, error_msg)
                         delete_message_later(chat_id, msg_id, 1800)
