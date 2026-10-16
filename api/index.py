@@ -9,12 +9,11 @@ from bs4 import BeautifulSoup
 BOT_TOKEN = "8621084667:AAGrNfeOwpl1H-6PYho3o6r2vICv2Mg4dLM"
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
-# ඔයාගේ ImgBB Logo Link එක
 LOGO_URL = "https://i.ibb.co/60cF3xk3/logo.png"
 
 app = Flask(__name__)
 
-SUPPORTED_SITES_TEXT = """🌐 **ꜱᴜᴩᴩᴏʀᴛᴇᴅ ꜱɪᴛᴇꜱ [147 ᴛᴏᴛᴀʟ]**
+SUPPORTED_SITES_TEXT = """🌐 **ꜱᴜᴩᴩᴏʀᴛᴇᴅ ꜱɪᴛᴇꜱ**
 
 • 10drives
 • 4br
@@ -177,7 +176,6 @@ def delete_message_later(chat_id, message_id, delay=1800):
     thread.start()
 
 def set_reaction(chat_id, message_id, emoji="🔥"):
-    """පණිවිඩයකට ස්වයංක්‍රීයව Reaction එකක් (Emoji) දැමීම"""
     url = f"{TELEGRAM_API}/setMessageReaction"
     payload = {
         "chat_id": chat_id,
@@ -198,7 +196,6 @@ def send_message(chat_id, text, reply_markup=None, auto_delete=True):
     if msg_id:
         if auto_delete:
             delete_message_later(chat_id, msg_id, 1800)
-        # බොට් යවන මැසේජ් එකටත් ඔටෝ රියැක්ට් කරයි
         set_reaction(chat_id, msg_id, "🔥")
     return res
 
@@ -218,8 +215,11 @@ def edit_message(chat_id, message_id, text):
     requests.post(f"{TELEGRAM_API}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": text, "parse_mode": "Markdown"})
 
 def resolve_url(url):
+    """බයිපාස් API කිහිපයක් හරහා vplinks වැනි සයිට් වල නියම අಂತಿම ලින්ක් එක ලබාගැනීම"""
+    
+    # 1. Primary Bypass API
     try:
-        api_res = requests.get(f"https://api.bypass.vip/bypass?url={url}", timeout=10).json()
+        api_res = requests.get(f"https://api.bypass.vip/bypass?url={url}", timeout=8).json()
         if api_res.get("status") == "success" and api_res.get("destination"):
             dest = api_res.get("destination")
             if dest and dest.startswith("http"):
@@ -227,8 +227,9 @@ def resolve_url(url):
     except Exception:
         pass
 
+    # 2. Secondary Bypass API (Alternative Worker)
     try:
-        api_res = requests.get(f"https://bypass.lasernull.workers.dev/?url={url}", timeout=10).json()
+        api_res = requests.get(f"https://bypass.lasernull.workers.dev/?url={url}", timeout=8).json()
         if api_res.get("destination"):
             dest = api_res.get("destination")
             if dest and dest.startswith("http"):
@@ -236,10 +237,21 @@ def resolve_url(url):
     except Exception:
         pass
 
+    # 3. Third Bypass API (Universal Bypasser)
+    try:
+        api_res = requests.get(f"https://eu.org/api/bypass?url={url}", timeout=8).json()
+        if api_res.get("result"):
+            dest = api_res.get("result")
+            if dest and dest.startswith("http"):
+                return dest
+    except Exception:
+        pass
+
+    # 4. Direct Scraping Fallback
     try:
         session = requests.Session()
-        headers = {'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15'}
-        res = session.get(url, headers=headers, allow_redirects=True, timeout=10)
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0 Safari/537.36'}
+        res = session.get(url, headers=headers, allow_redirects=True, timeout=8)
         if res.url and res.url != url and "vplinks" not in res.url:
             return res.url
             
@@ -271,10 +283,7 @@ def webhook():
             text = data["message"]["text"].strip()
             user_msg_id = data["message"]["message_id"]
 
-            # 1. User එවපු මැසේජ් එකට ඔටෝ රියැක්ට් කිරීම (🔥 දමයි)
             set_reaction(chat_id, user_msg_id, "🔥")
-
-            # 2. User එවපු මැසේජ් එකත් විනාඩි 30කින් ඩිලීට් වීමට දැමීම
             delete_message_later(chat_id, user_msg_id, 1800)
 
             if text == "/start":
@@ -320,7 +329,7 @@ def webhook():
                         "━━━━━━━━━━━━━━━━━━━\n"
                         "⚡ **ʙʏᴩᴀꜱꜱ ʙᴏᴛ - ꜱɪʙᴏᴋ** 🌟\n"
                         "━━━━━━━━━━━━━━━━━━━\n\n"
-                        f"🔗 **ᴏʀɪɢɪɴᴀ🇱 ʟɪɴᴋ :-**\n`{target_url}`\n\n"
+                        f"🔗 **ᴏʀɪɢɪɴᴀʟ ʟɪɴᴋ :-**\n`{target_url}`\n\n"
                         f"✅ **ʙʏᴩᴀꜱꜱᴇᴅ ʟɪɴᴋ :-**\n`{final_url}`\n\n"
                         "┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n"
                         "⚡ **ꜱᴏᴜʀᴄᴇ :-** `Live API Bypass`\n"
