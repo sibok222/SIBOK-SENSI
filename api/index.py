@@ -1,22 +1,24 @@
-import os
-from flask import Flask, request
-import telegram
 import requests
+from flask import Flask, request
 from deep_translator import GoogleTranslator
 
-# ඔයාගේ Credentials
 BOT_TOKEN = "8621084667:AAGrNfeOwpl1H-6PYho3o6r2vICv2Mg4dLM"
+TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
-bot = telegram.Bot(token=BOT_TOKEN)
 app = Flask(__name__)
 
-@app.route('/', methods=['POST'])
+def send_message(chat_id, text):
+    url = f"{TELEGRAM_API}/sendMessage"
+    payload = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
+    requests.post(url, json=payload)
+
+@app.route('/', methods=['POST', 'GET'])
 def webhook():
-    if request.method == "POST":
-        update = telegram.Update.de_json(request.get_json(force=True), bot)
-        if update.message and update.message.text:
-            chat_id = update.message.chat_id
-            text = update.message.text
+    if request.method == 'POST':
+        data = request.get_json(force=True)
+        if "message" in data and "text" in data["message"]:
+            chat_id = data["message"]["chat"]["id"]
+            text = data["message"]["text"]
 
             if text == "/start":
                 welcome_text = (
@@ -25,39 +27,36 @@ def webhook():
                     "👋 ආයුබෝවන්! මම ඕනෑම භාෂාවකින් වැඩ කරන Link Bypasser Bot කෙනෙක්.\n"
                     "ඔයාගේ Short Link එක මට එවන්න!"
                 )
-                bot.send_message(chat_id=chat_id, text=welcome_text)
-            
+                send_message(chat_id, welcome_text)
+
             elif "http" in text:
                 try:
                     detected_lang = GoogleTranslator(source='auto', target='en').detect(text)
                 except:
                     detected_lang = 'en'
 
-                sent_msg = bot.send_message(chat_id=chat_id, text="⏳ Bypassing link... Please wait / පොඩ්ඩක් ඉන්න...")
-                
+                send_message(chat_id, "⏳ Bypassing link... Please wait / පොඩ්ඩක් ඉන්න...")
+
                 try:
                     api_url = f"https://api.bypass.vip/bypass?url={text}"
                     res = requests.get(api_url).json()
-                    
+
                     if res.get("status") == "success":
                         dest = res.get("destination")
-                        reply_text = f"✅ **Original Link:**\n{dest}"
-                        bot.send_message(chat_id=chat_id, text=reply_text, parse_mode="Markdown")
+                        reply_text = f"✅ **Original Link:**\n`{dest}`"
+                        send_message(chat_id, reply_text)
                     else:
                         error_msg = "❌ Failed to bypass this link."
                         if detected_lang == 'si':
                             error_msg = "❌ මේ Link එක Bypass කරන්න බැරි වුණා."
-                        bot.send_message(chat_id=chat_id, text=error_msg)
+                        send_message(chat_id, error_msg)
                 except Exception as e:
-                    bot.send_message(chat_id=chat_id, text="❌ Error occurred! Try again later.")
+                    send_message(chat_id, "❌ Error occurred! Try again later.")
             else:
-                bot.send_message(chat_id=chat_id, text="⚠️ Please send a valid URL / කරුණාකර නිවැරදි Link එකක් එවන්න.")
+                send_message(chat_id, "⚠️ Please send a valid URL / කරුණාකර නිවැරදි Link එකක් එවන්න.")
 
-    return "ok", 200
-
-@app.route('/', methods=['GET'])
-def index():
-    return "Bot is live on Vercel!"
+        return "ok", 200
+    return "Bot is running live on Vercel!"
 
 if __name__ == "__main__":
     app.run()
