@@ -1,13 +1,15 @@
 import os
 import re
+import time
+import threading
 import requests
 from flask import Flask, request
 
 BOT_TOKEN = "8621084667:AAGrNfeOwpl1H-6PYho3o6r2vICv2Mg4dLM"
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
-# 🖼️ මෙතනට ඔයාගේ ImgBB එකේ Direct Image Link එක දාන්න (උදා: .png හෝ .jpg වලින් ඉවර වන එක)
-LOGO_URL = "https://i.ibb.co/60cF3xk3/logo.png" # අවශ්‍ය නම් වෙනස් කරගන්න
+# ImgBB Direct Image Link (Logo)
+LOGO_URL = "https://i.ibb.co/60cF3xk3/logo.png"
 
 app = Flask(__name__)
 
@@ -162,19 +164,47 @@ SUPPORTED_SITES_TEXT = """🌐 **ꜱᴜᴩᴩᴏʀᴛᴇᴅ ꜱɪᴛᴇꜱ [147 
 • zdrive
 • Safelink"""
 
-def send_message(chat_id, text, reply_markup=None):
+def delete_message_later(chat_id, message_id, delay=1800):
+    """පැය බාගයකට (තත්පර 1800) පසු Message එක Auto Delete කරන Function එක"""
+    def delayed_delete():
+        time.sleep(delay)
+        url = f"{TELEGRAM_API}/deleteMessage"
+        payload = {"chat_id": chat_id, "message_id": message_id}
+        try:
+            requests.post(url, json=payload)
+        except Exception:
+            pass
+
+    # Background Thread එකකින් දුවවයි
+    thread = threading.Thread(target=delayed_delete)
+    thread.daemon = True
+    thread.start()
+
+def send_message(chat_id, text, reply_markup=None, auto_delete=True):
     url = f"{TELEGRAM_API}/sendMessage"
     payload = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
     if reply_markup:
         payload["reply_markup"] = reply_markup
-    return requests.post(url, json=payload).json()
+    res = requests.post(url, json=payload).json()
+    
+    msg_id = res.get("result", {}).get("message_id")
+    if msg_id and auto_delete:
+        delete_message_later(chat_id, msg_id, 1800) # 1800 seconds = 30 minutes
+        
+    return res
 
-def send_photo(chat_id, photo_url, caption, reply_markup=None):
+def send_photo(chat_id, photo_url, caption, reply_markup=None, auto_delete=True):
     url = f"{TELEGRAM_API}/sendPhoto"
     payload = {"chat_id": chat_id, "photo": photo_url, "caption": caption, "parse_mode": "Markdown"}
     if reply_markup:
         payload["reply_markup"] = reply_markup
-    return requests.post(url, json=payload).json()
+    res = requests.post(url, json=payload).json()
+    
+    msg_id = res.get("result", {}).get("message_id")
+    if msg_id and auto_delete:
+        delete_message_later(chat_id, msg_id, 1800)
+        
+    return res
 
 def edit_message(chat_id, message_id, text):
     url = f"{TELEGRAM_API}/editMessageText"
@@ -196,13 +226,18 @@ def webhook():
         if "message" in data and "text" in data["message"]:
             chat_id = data["message"]["chat"]["id"]
             text = data["message"]["text"].strip()
+            user_msg_id = data["message"]["message_id"]
+
+            # User එවපු Link / Text එකත් පැය බාගයකින් Delete කරමු
+            delete_message_later(chat_id, user_msg_id, 1800)
 
             if text == "/start":
                 welcome_text = (
                     "👋 **Hello! I am BYPASS BOT - SIBOK** </>\n\n"
                     "Send me any short link from supported sites, and I will extract the original link for you!\n\n"
                     "👋 **ආයුබෝවන්! මම Link Bypasser Bot කෙනෙක්.**\n"
-                    "ඔයාගේ Short Link එක මට එවන්න!"
+                    "ඔයාගේ Short Link එක මට එවන්න!\n\n"
+                    "⏱️ _Note: All messages will auto-delete in 30 minutes._"
                 )
                 keyboard = {
                     "inline_keyboard": [
@@ -210,7 +245,6 @@ def webhook():
                     ]
                 }
                 
-                # Photo එක යැවීමට උත්සාහ කරයි, නොහැකි වුවහොත් Text පණිවිඩයක් ලෙස යවයි
                 res = send_photo(chat_id, LOGO_URL, welcome_text, reply_markup=keyboard)
                 if not res.get("ok"):
                     send_message(chat_id, welcome_text, reply_markup=keyboard)
@@ -237,15 +271,17 @@ def webhook():
                         edit_message(chat_id, msg_id, "⏳ **Bypassing link... [ ██████████ ] 100%**")
 
                     if final_url and final_url != target_url:
-                        reply_text = f"✅ **Original Link:**\n`{final_url}`"
+                        reply_text = f"✅ **Original Link:**\n`{final_url}`\n\n⏱️ _Auto-deletes in 30 minutes._"
                         if msg_id:
                             edit_message(chat_id, msg_id, reply_text)
+                            delete_message_later(chat_id, msg_id, 1800)
                         else:
                             send_message(chat_id, reply_text)
                     else:
                         error_msg = "❌ **Failed to bypass this link or no redirect found.**"
                         if msg_id:
                             edit_message(chat_id, msg_id, error_msg)
+                            delete_message_later(chat_id, msg_id, 1800)
                         else:
                             send_message(chat_id, error_msg)
 
@@ -253,6 +289,7 @@ def webhook():
                     error_msg = "❌ **Error occurred while processing!**"
                     if msg_id:
                         edit_message(chat_id, msg_id, error_msg)
+                        delete_message_later(chat_id, msg_id, 1800)
                     else:
                         send_message(chat_id, error_msg)
 
