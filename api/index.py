@@ -47,20 +47,19 @@ def webhook():
                 send_message(chat_id, "⏳ Bypassing link... Please wait / පොඩ්ඩක් ඉන්න...")
 
                 try:
-                    # වෙනත් සක්‍රීය Free Bypasser API එකක් භාවිතය
-                    api_url = f"https://api.emilyx.in/api/bypass?url={target_url}"
-                    res = requests.get(api_url, timeout=15).json()
+                    # Redirects අනුගමනය කරමින් අවසාන Link එක ලබාගැනීම
+                    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+                    response = requests.get(target_url, headers=headers, allow_redirects=True, timeout=15)
+                    
+                    final_url = response.url
 
-                    # Result එක ලබාගැනීම
-                    dest = res.get("destination") or res.get("result") or res.get("url")
-
-                    if dest and "bypass.vip/discord" not in str(dest):
-                        reply_text = f"✅ **Original Link:**\n`{dest}`"
+                    if final_url and final_url != target_url:
+                        reply_text = f"✅ **Original Link:**\n`{final_url}`"
                         send_message(chat_id, reply_text)
                     else:
-                        error_msg = "❌ Failed to bypass this link or API is busy."
+                        error_msg = "❌ Could not bypass this link directly. It may require a captcha or token."
                         if detected_lang == 'si':
-                            error_msg = "❌ මේ Link එක Bypass කරන්න බැරි වුණා. (API සීමාව ඉක්මවා ඇත)"
+                            error_msg = "❌ මේ Link එක කෙලින්ම Bypass කරන්න බැහැ (Captcha එකක් හෝ Token එකක් අවශ්‍ය විය හැක)."
                         send_message(chat_id, error_msg)
                 except Exception as e:
                     send_message(chat_id, "❌ Error occurred! Try again later.")
