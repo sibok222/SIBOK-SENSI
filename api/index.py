@@ -8,11 +8,8 @@ from flask import Flask, request
 BOT_TOKEN = "8621084667:AAGrNfeOwpl1H-6PYho3o6r2vICv2Mg4dLM"
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
-# ImgBB Direct Image Link (Logo)
+# ඔයාගේ ImgBB Logo Link එක
 LOGO_URL = "https://i.ibb.co/60cF3xk3/logo.png"
-
-# Telegram Animated Loading Sticker ID (Public Telegram Animated Sticker)
-LOADING_STICKER_FILE_ID = "CAACAgIAAxkBAAEZ75xnA3B4b6fC_8vXQ9F1v3aW_gABAAEC"
 
 app = Flask(__name__)
 
@@ -168,6 +165,7 @@ SUPPORTED_SITES_TEXT = """🌐 **ꜱᴜᴩᴩᴏʀᴛᴇᴅ ꜱɪᴛᴇꜱ [147 
 • Safelink"""
 
 def delete_message_later(chat_id, message_id, delay=1800):
+    """පැය බාගයකට (තත්පර 1800) පසු පණිවිඩය ස්වয়ංක්‍රීයව මකා දැමීම"""
     def delayed_delete():
         time.sleep(delay)
         try:
@@ -198,21 +196,42 @@ def send_photo(chat_id, photo_url, caption, reply_markup=None, auto_delete=True)
         delete_message_later(chat_id, msg_id, 1800)
     return res
 
-def send_sticker(chat_id, sticker_id):
-    res = requests.post(f"{TELEGRAM_API}/sendSticker", json={"chat_id": chat_id, "sticker": sticker_id}).json()
-    msg_id = res.get("result", {}).get("message_id")
-    if msg_id:
-        delete_message_later(chat_id, msg_id, 1800)
-    return msg_id
-
 def edit_message(chat_id, message_id, text):
     requests.post(f"{TELEGRAM_API}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": text, "parse_mode": "Markdown"})
+
+def resolve_url(url):
+    """විවිධ Short links සහ Redirects සාර්ථකව Bypass කරගැනීමේ ක්‍රමවේදය"""
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5'
+    }
+    
+    # පළමු උත්සාහය (Normal Redirects)
+    try:
+        session = requests.Session()
+        res = session.get(url, headers=headers, allow_redirects=True, timeout=10)
+        if res.url and res.url != url:
+            return res.url
+    except Exception:
+        pass
+
+    # දෙවන උත්සාහය (Bypass API Backup)
+    try:
+        api_res = requests.get(f"https://api.bypass.vip/bypass?url={url}", timeout=10).json()
+        if api_res.get("status") == "success" and api_res.get("destination"):
+            return api_res.get("destination")
+    except Exception:
+        pass
+
+    return None
 
 @app.route('/', methods=['POST', 'GET'])
 def webhook():
     if request.method == 'POST':
         data = request.get_json(force=True)
 
+        # Supported Sites Button එක එබූ විට
         if "callback_query" in data:
             query = data["callback_query"]
             chat_id = query["message"]["chat"]["id"]
@@ -225,8 +244,10 @@ def webhook():
             text = data["message"]["text"].strip()
             user_msg_id = data["message"]["message_id"]
 
+            # მომხმარებელი එවපු ලින්ක් එකත් පැය භාගයකින් ඩිලීට් වෙන්න දමමු
             delete_message_later(chat_id, user_msg_id, 1800)
 
+            # /start විධානය
             if text == "/start":
                 welcome_text = (
                     "👋 **Hello! I am BYPASS BOT - SIBOK** </>\n\n"
@@ -246,61 +267,49 @@ def webhook():
                     send_message(chat_id, welcome_text, reply_markup=keyboard)
                 return "ok", 200
 
+            # URL එකක් දැයි පරීක්ෂා කිරීම
             url_pattern = r'https?://(?:[-\w.]|(?:%[\da-fA-F]{2}))+[^\s]*'
             url_match = re.search(url_pattern, text)
 
             if url_match:
                 target_url = url_match.group(0)
 
-                # 1. Send Animated Loading Sticker
-                send_sticker(chat_id, LOADING_STICKER_FILE_ID)
-
-                # 2. Send Large Live Loading Message
-                sent_msg = send_message(chat_id, "🚀 **PROCESSING YOUR LINK...**\n\n`[ █▒▒▒▒▒▒▒▒▒ ] 10%`\n_Connecting to server..._")
+                # 1. Live Loading පණිවිඩය යැවීම (10%)
+                sent_msg = send_message(chat_id, "🌀 **BYPASSING LINK...**\n\n`[ █▒▒▒▒▒▒▒▒▒ ] 10%`\n_⚡ Connecting to server..._")
                 msg_id = sent_msg.get("result", {}).get("message_id")
 
+                # 2. 50% වෙත යාවත්කාලීන කිරීම
                 if msg_id:
-                    time.sleep(0.8)
-                    edit_message(chat_id, msg_id, "🚀 **PROCESSING YOUR LINK...**\n\n`[ █████▒▒▒▒▒ ] 50%`\n_Bypassing shortener redirects..._")
+                    time.sleep(1)
+                    edit_message(chat_id, msg_id, "🌀 **BYPASSING LINK...**\n\n`[ █████▒▒▒▒▒ ] 50%`\n_⚡ Extracting destination URL..._")
 
-                try:
-                    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
-                    response = requests.get(target_url, headers=headers, allow_redirects=True, timeout=12)
-                    final_url = response.url
+                # 3. ලින්ක් එක Bypass කිරීම
+                final_url = resolve_url(target_url)
 
+                # 4. 100% වෙත යාවත්කාලීන කිරීම
+                if msg_id:
+                    edit_message(chat_id, msg_id, "🌀 **BYPASSING LINK...**\n\n`[ ██████████ ] 100%`\n_⚡ Bypassing complete!_")
+                    time.sleep(0.5)
+
+                if final_url:
+                    reply_text = (
+                        "🎉 **BYPASS SUCCESSFUL!**\n\n"
+                        f"🔗 **Original Link:**\n`{final_url}`\n\n"
+                        "━━━━━━━━━━━━━━━━━━━\n"
+                        "⏱️ _This message will auto-delete in 30 minutes._"
+                    )
                     if msg_id:
-                        time.sleep(0.5)
-                        edit_message(chat_id, msg_id, "🚀 **PROCESSING YOUR LINK...**\n\n`[ ██████████ ] 100%`\n_Almost done..._")
-
-                    if final_url and final_url != target_url:
-                        reply_text = (
-                            "🎉 **BYPASS SUCCESSFUL!**\n\n"
-                            f"🔗 **Original Link:**\n`{final_url}`\n\n"
-                            "━━━━━━━━━━━━━━━━━━━\n"
-                            "⏱️ _This message will auto-delete in 30 minutes._"
-                        )
-                        if msg_id:
-                            edit_message(chat_id, msg_id, reply_text)
-                            delete_message_later(chat_id, msg_id, 1800)
-                        else:
-                            send_message(chat_id, reply_text)
+                        edit_message(chat_id, msg_id, reply_text)
                     else:
-                        error_msg = (
-                            "❌ **BYPASS FAILED!**\n\n"
-                            "⚠️ Could not extract the direct link or no redirect found.\n\n"
-                            "⏱️ _Auto-deletes in 30 minutes._"
-                        )
-                        if msg_id:
-                            edit_message(chat_id, msg_id, error_msg)
-                            delete_message_later(chat_id, msg_id, 1800)
-                        else:
-                            send_message(chat_id, error_msg)
-
-                except Exception as e:
-                    error_msg = "❌ **Error occurred while processing the link!**"
+                        send_message(chat_id, reply_text)
+                else:
+                    error_msg = (
+                        "❌ **BYPASS FAILED!**\n\n"
+                        "⚠️ Could not extract the direct link or bypass protection.\n\n"
+                        "⏱️ _Auto-deletes in 30 minutes._"
+                    )
                     if msg_id:
                         edit_message(chat_id, msg_id, error_msg)
-                        delete_message_later(chat_id, msg_id, 1800)
                     else:
                         send_message(chat_id, error_msg)
 
