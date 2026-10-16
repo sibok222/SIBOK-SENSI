@@ -32,7 +32,6 @@ def webhook():
                 send_message(chat_id, welcome_text)
 
             elif "http" in text:
-                # Text එකෙන් URL එක විතරක් වෙනම වෙන් කරගැනීම (Regex)
                 url_match = re.search(r'https?://[^\s]+', text)
                 if not url_match:
                     send_message(chat_id, "⚠️ Please send a valid URL / කරුණාකර නිවැරදි Link එකක් එවන්න.")
@@ -48,20 +47,20 @@ def webhook():
                 send_message(chat_id, "⏳ Bypassing link... Please wait / පොඩ්ඩක් ඉන්න...")
 
                 try:
-                    api_url = f"https://api.bypass.vip/bypass?url={target_url}"
-                    res = requests.get(api_url, timeout=10).json()
+                    # වෙනත් සක්‍රීය Free Bypasser API එකක් භාවිතය
+                    api_url = f"https://api.emilyx.in/api/bypass?url={target_url}"
+                    res = requests.get(api_url, timeout=15).json()
 
-                    # API එකෙන් එන විවිධ Response Keys පරීක්ෂා කිරීම
-                    dest = res.get("destination") or res.get("result") or res.get("url") or res.get("bypassed_url")
+                    # Result එක ලබාගැනීම
+                    dest = res.get("destination") or res.get("result") or res.get("url")
 
-                    # None හෝ فاضි නොවී හරියටම Destination Link එක ආවොත් පමණක් යැවීම
-                    if (res.get("status") == "success" or res.get("success") is True) and dest and str(dest).lower() != "none":
+                    if dest and "bypass.vip/discord" not in str(dest):
                         reply_text = f"✅ **Original Link:**\n`{dest}`"
                         send_message(chat_id, reply_text)
                     else:
-                        error_msg = "❌ Failed to bypass this link."
+                        error_msg = "❌ Failed to bypass this link or API is busy."
                         if detected_lang == 'si':
-                            error_msg = "❌ මේ Link එක Bypass කරන්න බැරි වුණා (Link එකේ අවුලක් හෝ Supported නැත)."
+                            error_msg = "❌ මේ Link එක Bypass කරන්න බැරි වුණා. (API සීමාව ඉක්මවා ඇත)"
                         send_message(chat_id, error_msg)
                 except Exception as e:
                     send_message(chat_id, "❌ Error occurred! Try again later.")
