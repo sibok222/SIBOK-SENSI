@@ -4,6 +4,7 @@ import time
 import threading
 import requests
 from flask import Flask, request
+from bs4 import BeautifulSoup
 
 BOT_TOKEN = "8621084667:AAGrNfeOwpl1H-6PYho3o6r2vICv2Mg4dLM"
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
@@ -199,11 +200,11 @@ def edit_message(chat_id, message_id, text):
     requests.post(f"{TELEGRAM_API}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": text, "parse_mode": "Markdown"})
 
 def resolve_url(url):
-    """විවිධ Bypass API හරහා සැබෑ අಂತಿම ලින්ක් එක ලබාගැනීම"""
+    """බයිපාස් API සහ Advanced Scraping හරහා නියම අಂತಿම ලින්ක් එක ලබාගැනීම"""
     
-    # 1. පළමු Bypass API එක
+    # 1. Bypass API එක හරහා උත්සාහ කිරීම
     try:
-        api_res = requests.get(f"https://api.bypass.vip/bypass?url={url}", timeout=8).json()
+        api_res = requests.get(f"https://api.bypass.vip/bypass?url={url}", timeout=10).json()
         if api_res.get("status") == "success" and api_res.get("destination"):
             dest = api_res.get("destination")
             if dest and dest.startswith("http"):
@@ -211,9 +212,9 @@ def resolve_url(url):
     except Exception:
         pass
 
-    # 2. දෙවන විකල්ප Bypass API එක
+    # 2. Backup Bypass API එක
     try:
-        api_res = requests.get(f"https://bypass.lasernull.workers.dev/?url={url}", timeout=8).json()
+        api_res = requests.get(f"https://bypass.lasernull.workers.dev/?url={url}", timeout=10).json()
         if api_res.get("destination"):
             dest = api_res.get("destination")
             if dest and dest.startswith("http"):
@@ -221,12 +222,25 @@ def resolve_url(url):
     except Exception:
         pass
 
-    # 3. සාමාන්‍ය Redirects පරීක්ෂා කිරීම
+    # 3. Direct Session Requests & HTML Parsing (vplinks වැනි සයිට් සඳහා)
     try:
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0 Safari/537.36'}
-        res = requests.get(url, headers=headers, allow_redirects=True, timeout=8)
-        if res.url and res.url != url and not "vplinks" in res.url:
+        session = requests.Session()
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        }
+        res = session.get(url, headers=headers, allow_redirects=True, timeout=10)
+        
+        # ලින්ක් එක වෙනස් වී ඇත්නම් සහ කෙටි ලින්ක් එක නොවේ නම්
+        if res.url and res.url != url and "vplinks" not in res.url:
             return res.url
+            
+        # HTML එක ඇතුළේ ඇති a tags පරීක්ෂා කිරීම
+        soup = BeautifulSoup(res.text, 'html.parser')
+        for a in soup.find_all('a', href=True):
+            href = a['href']
+            if href.startswith('http') and 'vplinks' not in href and 'google' not in href and 'telegram' not in href:
+                return href
     except Exception:
         pass
 
@@ -246,6 +260,7 @@ def webhook():
 
         if "message" in data and "text" in data["message"]:
             chat_id = data["message"]["chat"]["id"]
+            user_first_name = data["message"]["from"].get("first_name", "User")
             text = data["message"]["text"].strip()
             user_msg_id = data["message"]["message_id"]
 
@@ -280,7 +295,7 @@ def webhook():
                 msg_id = sent_msg.get("result", {}).get("message_id")
 
                 if msg_id:
-                    time.sleep(0.6)
+                    time.sleep(0.5)
                     edit_message(chat_id, msg_id, "🌀 **BYPASSING LINK...**\n\n`[ █████▒▒▒▒▒ ] 50%`\n_⚡ Extracting destination..._")
 
                 final_url = resolve_url(target_url)
@@ -290,10 +305,18 @@ def webhook():
                     time.sleep(0.3)
 
                 if final_url:
+                    # ඉල්ලූ ආකාරයටම Professional Template එක සකස් කර ඇත
                     reply_text = (
-                        "🎉 **BYPASS SUCCESSFUL!**\n\n"
-                        f"🔗 **Original Link:**\n`{final_url}`\n\n"
                         "━━━━━━━━━━━━━━━━━━━\n"
+                        "⚡ **ʙʏᴩᴀꜱꜱ ʙᴏᴛ - ꜱɪʙᴏᴋ** 🌟\n"
+                        "━━━━━━━━━━━━━━━━━━━\n\n"
+                        f"🔗 **ᴏʀɪɢɪɴᴀʟ ʟɪɴᴋ :-**\n`{target_url}`\n\n"
+                        f"✅ **ʙʏᴩᴀꜱꜱᴇᴅ ʟɪɴᴋ :-**\n`{final_url}`\n\n"
+                        "┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n"
+                        "⚡ **ꜱᴏᴜʀᴄᴇ :-** `Live API Bypass`\n"
+                        f"🥳 **ʀᴇqᴜᴇꜱᴛᴇᴅ ʙʏ :-** `{user_first_name}`\n"
+                        "━━━━━━━━━━━━━━━━━━━\n"
+                        "🥫 **ᴅᴇᴠ :** `@SibokBypasser_bot` 🌟\n\n"
                         "⏱️ _This message will auto-delete in 30 minutes._"
                     )
                     if msg_id:
