@@ -3,12 +3,12 @@ import re
 import time
 import threading
 import requests
-from urllib.parse import urljoin
 from flask import Flask, request
 
 BOT_TOKEN = "8621084667:AAGrNfeOwpl1H-6PYho3o6r2vICv2Mg4dLM"
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
+# ඔයාගේ ImgBB Logo Link එක
 LOGO_URL = "https://i.ibb.co/60cF3xk3/logo.png"
 
 app = Flask(__name__)
@@ -199,14 +199,11 @@ def edit_message(chat_id, message_id, text):
     requests.post(f"{TELEGRAM_API}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": text, "parse_mode": "Markdown"})
 
 def resolve_url(url):
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*|q=0.8',
-    }
+    """විවිධ Bypass API හරහා සැබෑ අಂತಿම ලින්ක් එක ලබාගැනීම"""
     
-    # 1. Bypass API
+    # 1. පළමු Bypass API එක
     try:
-        api_res = requests.get(f"https://api.bypass.vip/bypass?url={url}", timeout=10).json()
+        api_res = requests.get(f"https://api.bypass.vip/bypass?url={url}", timeout=8).json()
         if api_res.get("status") == "success" and api_res.get("destination"):
             dest = api_res.get("destination")
             if dest and dest.startswith("http"):
@@ -214,14 +211,22 @@ def resolve_url(url):
     except Exception:
         pass
 
-    # 2. Redirect session check with urljoin
+    # 2. දෙවන විකල්ප Bypass API එක
     try:
-        session = requests.Session()
-        res = session.get(url, headers=headers, allow_redirects=True, timeout=10)
-        if res.url:
-            full_url = urljoin(url, res.url)
-            if full_url != url:
-                return full_url
+        api_res = requests.get(f"https://bypass.lasernull.workers.dev/?url={url}", timeout=8).json()
+        if api_res.get("destination"):
+            dest = api_res.get("destination")
+            if dest and dest.startswith("http"):
+                return dest
+    except Exception:
+        pass
+
+    # 3. සාමාන්‍ය Redirects පරීක්ෂා කිරීම
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0 Safari/537.36'}
+        res = requests.get(url, headers=headers, allow_redirects=True, timeout=8)
+        if res.url and res.url != url and not "vplinks" in res.url:
+            return res.url
     except Exception:
         pass
 
