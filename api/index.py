@@ -165,7 +165,6 @@ SUPPORTED_SITES_TEXT = """🌐 **ꜱᴜᴩᴩᴏʀᴛᴇᴅ ꜱɪᴛᴇꜱ [147 
 • Safelink"""
 
 def delete_message_later(chat_id, message_id, delay=1800):
-    """පැය බාගයකට (තත්පර 1800) පසු පණිවිඩය ස්වয়ංක්‍රීයව මකා දැමීම"""
     def delayed_delete():
         time.sleep(delay)
         try:
@@ -200,25 +199,32 @@ def edit_message(chat_id, message_id, text):
     requests.post(f"{TELEGRAM_API}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": text, "parse_mode": "Markdown"})
 
 def resolve_url(url):
-    """විවිධ Short links සහ Redirects සාර්ථකව Bypass කරගැනීමේ ක්‍රමවේදය"""
+    """වැඩිදියුණු කළ Bypass සහ Redirect හැසිරවීමේ ක්‍රමවේදය"""
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5'
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Connection': 'keep-alive'
     }
     
-    # පළමු උත්සාහය (Normal Redirects)
+    # 1. Session එකක් හරහා උත්සාහ කිරීම
     try:
         session = requests.Session()
-        res = session.get(url, headers=headers, allow_redirects=True, timeout=10)
-        if res.url and res.url != url:
+        res = session.get(url, headers=headers, allow_redirects=True, timeout=8)
+        if res.url and res.url != url and "vplinks" not in res.url:
             return res.url
+            
+        # HTML එක ඇතුළත Form Action හෝ Meta Redirect තියේදැයි බැලීම
+        if "<form" in res.text or "action=" in res.text:
+            match = re.search(r'action="([^"]+)"', res.text)
+            if match:
+                return match.group(1)
     except Exception:
         pass
 
-    # දෙවන උත්සාහය (Bypass API Backup)
+    # 2. විකල්ප නිදහස් Bypass API එකක් හරහා ලබා ගැනීම
     try:
-        api_res = requests.get(f"https://api.bypass.vip/bypass?url={url}", timeout=10).json()
+        api_res = requests.get(f"https://api.bypass.vip/bypass?url={url}", timeout=8).json()
         if api_res.get("status") == "success" and api_res.get("destination"):
             return api_res.get("destination")
     except Exception:
@@ -231,7 +237,6 @@ def webhook():
     if request.method == 'POST':
         data = request.get_json(force=True)
 
-        # Supported Sites Button එක එබූ විට
         if "callback_query" in data:
             query = data["callback_query"]
             chat_id = query["message"]["chat"]["id"]
@@ -244,10 +249,8 @@ def webhook():
             text = data["message"]["text"].strip()
             user_msg_id = data["message"]["message_id"]
 
-            # მომხმარებელი එවපු ලින්ක් එකත් පැය භාගයකින් ඩිලීට් වෙන්න දමමු
             delete_message_later(chat_id, user_msg_id, 1800)
 
-            # /start විධානය
             if text == "/start":
                 welcome_text = (
                     "👋 **Hello! I am BYPASS BOT - SIBOK** </>\n\n"
@@ -267,29 +270,24 @@ def webhook():
                     send_message(chat_id, welcome_text, reply_markup=keyboard)
                 return "ok", 200
 
-            # URL එකක් දැයි පරීක්ෂා කිරීම
             url_pattern = r'https?://(?:[-\w.]|(?:%[\da-fA-F]{2}))+[^\s]*'
             url_match = re.search(url_pattern, text)
 
             if url_match:
                 target_url = url_match.group(0)
 
-                # 1. Live Loading පණිවිඩය යැවීම (10%)
-                sent_msg = send_message(chat_id, "🌀 **BYPASSING LINK...**\n\n`[ █▒▒▒▒▒▒▒▒▒ ] 10%`\n_⚡ Connecting to server..._")
+                sent_msg = send_message(chat_id, "🌀 **BYPASSING LINK...**\n\n`[ █▒▒▒▒▒▒▒▒▒ ] 10%`\n_⚡ Connecting..._")
                 msg_id = sent_msg.get("result", {}).get("message_id")
 
-                # 2. 50% වෙත යාවත්කාලීන කිරීම
                 if msg_id:
-                    time.sleep(1)
-                    edit_message(chat_id, msg_id, "🌀 **BYPASSING LINK...**\n\n`[ █████▒▒▒▒▒ ] 50%`\n_⚡ Extracting destination URL..._")
+                    time.sleep(0.6)
+                    edit_message(chat_id, msg_id, "🌀 **BYPASSING LINK...**\n\n`[ █████▒▒▒▒▒ ] 50%`\n_⚡ Bypassing protection..._")
 
-                # 3. ලින්ක් එක Bypass කිරීම
                 final_url = resolve_url(target_url)
 
-                # 4. 100% වෙත යාවත්කාලීන කිරීම
                 if msg_id:
-                    edit_message(chat_id, msg_id, "🌀 **BYPASSING LINK...**\n\n`[ ██████████ ] 100%`\n_⚡ Bypassing complete!_")
-                    time.sleep(0.5)
+                    edit_message(chat_id, msg_id, "🌀 **BYPASSING LINK...**\n\n`[ ██████████ ] 100%`\n_⚡ Almost done..._")
+                    time.sleep(0.3)
 
                 if final_url:
                     reply_text = (
