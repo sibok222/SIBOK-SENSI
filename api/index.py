@@ -199,34 +199,29 @@ def edit_message(chat_id, message_id, text):
     requests.post(f"{TELEGRAM_API}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": text, "parse_mode": "Markdown"})
 
 def resolve_url(url):
-    """වැඩිදියුණු කළ Bypass සහ Redirect හැසිරවීමේ ක්‍රමවේදය"""
+    """අಂತಿම නියම සැබෑ ලින්ක් එක (Final Destination URL) ලබාගැනීම"""
     headers = {
-        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Connection': 'keep-alive'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5'
     }
     
-    # 1. Session එකක් හරහා උත්සාහ කිරීම
+    # 1. Bypass API එක හරහා සැබෑ අಂತಿම ලින්ක් එක ලබා ගැනීමට උත්සාහ කිරීම
     try:
-        session = requests.Session()
-        res = session.get(url, headers=headers, allow_redirects=True, timeout=8)
-        if res.url and res.url != url and "vplinks" not in res.url:
-            return res.url
-            
-        # HTML එක ඇතුළත Form Action හෝ Meta Redirect තියේදැයි බැලීම
-        if "<form" in res.text or "action=" in res.text:
-            match = re.search(r'action="([^"]+)"', res.text)
-            if match:
-                return match.group(1)
+        api_res = requests.get(f"https://api.bypass.vip/bypass?url={url}", timeout=10).json()
+        if api_res.get("status") == "success" and api_res.get("destination"):
+            dest = api_res.get("destination")
+            if dest and dest.startswith("http"):
+                return dest
     except Exception:
         pass
 
-    # 2. විකල්ප නිදහස් Bypass API එකක් හරහා ලබා ගැනීම
+    # 2. Redirects හරහා අಂತಿම ලින්ක් එක සෙවීම
     try:
-        api_res = requests.get(f"https://api.bypass.vip/bypass?url={url}", timeout=8).json()
-        if api_res.get("status") == "success" and api_res.get("destination"):
-            return api_res.get("destination")
+        session = requests.Session()
+        res = session.get(url, headers=headers, allow_redirects=True, timeout=10)
+        if res.url and res.url != url and not "vplinks" in res.url:
+            return res.url
     except Exception:
         pass
 
@@ -281,12 +276,12 @@ def webhook():
 
                 if msg_id:
                     time.sleep(0.6)
-                    edit_message(chat_id, msg_id, "🌀 **BYPASSING LINK...**\n\n`[ █████▒▒▒▒▒ ] 50%`\n_⚡ Bypassing protection..._")
+                    edit_message(chat_id, msg_id, "🌀 **BYPASSING LINK...**\n\n`[ █████▒▒▒▒▒ ] 50%`\n_⚡ Extracting destination..._")
 
                 final_url = resolve_url(target_url)
 
                 if msg_id:
-                    edit_message(chat_id, msg_id, "🌀 **BYPASSING LINK...**\n\n`[ ██████████ ] 100%`\n_⚡ Almost done..._")
+                    edit_message(chat_id, msg_id, "🌀 **BYPASSING LINK...**\n\n`[ ██████████ ] 100%`\n_⚡ Done!_")
                     time.sleep(0.3)
 
                 if final_url:
@@ -303,7 +298,7 @@ def webhook():
                 else:
                     error_msg = (
                         "❌ **BYPASS FAILED!**\n\n"
-                        "⚠️ Could not extract the direct link or bypass protection.\n\n"
+                        "⚠️ Could not extract the final destination link.\n\n"
                         "⏱️ _Auto-deletes in 30 minutes._"
                     )
                     if msg_id:
